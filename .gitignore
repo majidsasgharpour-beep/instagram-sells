@@ -7,3 +7,6 @@ build/
 next-env.d.ts
 .DS_Store
 .vercel
+
+# desktop installer output
+release/

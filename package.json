@@ -12,7 +12,8 @@
     "lint": "next lint",
     "desktop": "electron .",
     "desktop:dev": "electron . --dev",
-    "desktop:build": "electron . --rebuild"
+    "desktop:build": "electron . --rebuild",
+    "dist": "next build && electron-builder --win --x64"
   },
   "dependencies": {
     "next": "15.3.8",
@@ -31,6 +32,43 @@
     "@types/three": "^0.184.1",
     "eslint": "^9",
     "eslint-config-next": "15.3.3",
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "author": "Apex",
+  "build": {
+    "appId": "com.apex.desktop",
+    "productName": "Apex",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "!.next/cache{,/**}",
+      "package.json",
+      "next.config.mjs"
+    ],
+    "asar": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Apex",
+      "artifactName": "Apex-Setup-${version}.exe"
+    }
   }
 }
