@@ -13,12 +13,12 @@ import { useSyncExternalStore } from "react";
 const KEY_NAME = "apex.gemini.apiKey";
 
 export type Phase = "off" | "connecting" | "listening" | "thinking" | "speaking";
-export type GeminiStatus = { phase: Phase; error: string | null };
+export type GeminiStatus = { phase: Phase; error: string | null; info: string };
 
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-let status: GeminiStatus = { phase: "off", error: null };
+let status: GeminiStatus = { phase: "off", error: null, info: "" };
 let keyCache = "";
 let keyLoaded = false;
 
@@ -50,7 +50,7 @@ export function getStatus(): GeminiStatus {
 
 export function setStatus(patch: Partial<GeminiStatus>) {
   const next = { ...status, ...patch };
-  if (next.phase === status.phase && next.error === status.error) return;
+  if (next.phase === status.phase && next.error === status.error && next.info === status.info) return;
   status = next;
   emit();
 }
@@ -68,7 +68,7 @@ function subscribe(cb: () => void) {
   };
 }
 
-const SERVER_STATUS: GeminiStatus = { phase: "off", error: null };
+const SERVER_STATUS: GeminiStatus = { phase: "off", error: null, info: "" };
 
 export const useGeminiKey = () => useSyncExternalStore(subscribe, getKey, () => "");
 export const useGeminiStatus = () => useSyncExternalStore(subscribe, getStatus, () => SERVER_STATUS);

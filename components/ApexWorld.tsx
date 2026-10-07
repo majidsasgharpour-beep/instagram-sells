@@ -255,15 +255,16 @@ export default function ApexWorld() {
   const stopLive = () => {
     liveRef.current?.stop();
     liveRef.current = null;
-    setStatus({ phase: "off" });
+    setStatus({ phase: "off", info: "" });
   };
 
   const startLive = () => {
-    setStatus({ phase: "connecting", error: null });
+    setStatus({ phase: "connecting", error: null, info: "" });
     const session = new GeminiLiveSession(apiKey, {
       onPhase: (p) => { if (liveRef.current === session) setStatus({ phase: p }); },
       onError: (message) => { if (liveRef.current === session) setStatus({ error: message }); },
-      onClosed: () => { if (liveRef.current === session) { liveRef.current = null; setStatus({ phase: "off" }); } },
+      onInfo: (text) => { if (liveRef.current === session) setStatus({ info: text }); },
+      onClosed: () => { if (liveRef.current === session) { liveRef.current = null; setStatus({ phase: "off", info: "" }); } },
     });
     liveRef.current = session;
     void session.start();

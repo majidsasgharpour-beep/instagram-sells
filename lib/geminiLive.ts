@@ -31,6 +31,8 @@ export type LiveEvents = {
   onPhase: (p: LivePhase) => void;
   onError: (message: string) => void;
   onClosed: () => void;
+  /** Live diagnostics for the key popover: counters + what Gemini heard / said. */
+  onInfo?: (text: string) => void;
 };
 
 // AudioWorklet source, loaded from a Blob so there is no extra file to serve.
@@ -97,6 +99,11 @@ export class GeminiLiveSession {
   private turnDone = true;
   private speaking = false;
   private setupTimer: ReturnType<typeof setTimeout> | null = null;
+  private infoTimer: ReturnType<typeof setInterval> | null = null;
+  private sentChunks = 0;
+  private recvChunks = 0;
+  private heard = "";
+  private said = "";
 
   constructor(private key: string, private ev: LiveEvents) {}
 
@@ -128,6 +135,7 @@ export class GeminiLiveSession {
       );
     }
     if (this.closed) { this.teardown(); return; }
+    try { await this.ctx?.resume(); } catch { /* checked in the info line */ }
 
     try {
       await this.setupMic();
@@ -164,6 +172,7 @@ export class GeminiLiveSession {
     this.micNode.port.onmessage = (e: MessageEvent<Float32Array>) => {
       if (!this.ready || this.closed || this.ws?.readyState !== WebSocket.OPEN) return;
       const pcm = toPcm16k(e.data, ctx.sampleRate);
+      this.sentChunks++;
       this.send({
         realtimeInput: {
           audio: { data: bytesToBase64(new Uint8Array(pcm.buffer)), mimeType: `audio/pcm;rate=${SEND_RATE}` },
@@ -174,6 +183,7 @@ export class GeminiLiveSession {
 
   private connect() {
     const ws = new WebSocket(`${WS_URL}?key=${encodeURIComponent(this.key)}`);
+    ws.binaryType = "arraybuffer"; // decoded synchronously below so audio chunks keep their order
     this.ws = ws;
 
     this.setupTimer = setTimeout(() => {
@@ -195,9 +205,9 @@ export class GeminiLiveSession {
       });
     };
 
-    ws.onmessage = async (e: MessageEvent) => {
+    ws.onmessage = (e: MessageEvent) => {
       try {
-        const raw = typeof e.data === "string" ? e.data : await (e.data as Blob).text();
+        const raw = typeof e.data === "string" ? e.data : new TextDecoder().decode(e.data as ArrayBuffer);
         this.handle(JSON.parse(raw));
       } catch { /* ignore a malformed frame */ }
     };
@@ -223,11 +233,18 @@ export class GeminiLiveSession {
       this.ready = true;
       if (this.setupTimer) { clearTimeout(this.setupTimer); this.setupTimer = null; }
       this.ev.onPhase("listening");
+      this.infoTimer = setInterval(() => this.pushInfo(), 1000);
+      this.pushInfo();
       return;
     }
 
+    if (msg.goAway) { this.fail("Gemini is ending this session. Tap the orb to start again."); return; }
+
     const sc = msg.serverContent;
     if (!sc) return;
+
+    if (sc.inputTranscription?.text) this.heard = (this.heard + sc.inputTranscription.text).slice(-140);
+    if (sc.outputTranscription?.text) this.said = (this.said + sc.outputTranscription.text).slice(-140);
 
     if (sc.interrupted) this.flushPlayback();
 
@@ -244,7 +261,18 @@ export class GeminiLiveSession {
     if (sc.turnComplete) {
       this.turnDone = true;
       this.maybeListening();
+      this.heard = ""; // next turn starts a fresh line
+      this.said = "";
     }
+  }
+
+  private pushInfo() {
+    if (this.closed || !this.ev.onInfo) return;
+    const audio = this.ctx ? (this.ctx.state === "running" ? "audio on" : `audio ${this.ctx.state}`) : "audio off";
+    let t = `${audio} · mic sent ${this.sentChunks} · voice received ${this.recvChunks}`;
+    if (this.heard) t += `\nYou: ${this.heard}`;
+    if (this.said) t += `\nApex: ${this.said}`;
+    this.ev.onInfo(t);
   }
 
   // ── playback ─────────────────────────────────────────────────────────────
@@ -253,6 +281,7 @@ export class GeminiLiveSession {
     const ctx = this.ctx;
     if (!ctx || this.closed || bytes.length < 2) return;
 
+    this.recvChunks++;
     const n = Math.floor(bytes.length / 2);
     const view = new DataView(bytes.buffer, bytes.byteOffset, n * 2);
     const buf = ctx.createBuffer(1, n, RECV_RATE);
@@ -311,6 +340,7 @@ export class GeminiLiveSession {
 
   private teardown() {
     if (this.setupTimer) { clearTimeout(this.setupTimer); this.setupTimer = null; }
+    if (this.infoTimer) { clearInterval(this.infoTimer); this.infoTimer = null; }
     this.sinks.forEach((s) => { s.onended = null; try { s.stop(); } catch { /* ignore */ } });
     this.sinks.clear();
     if (this.micNode) { this.micNode.port.onmessage = null; try { this.micNode.disconnect(); } catch { /* ignore */ } }

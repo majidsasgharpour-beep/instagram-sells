@@ -145,6 +145,12 @@ export default function GeminiKeyButton() {
                   : "Saved only in this browser. Add a key, then tap the orb to talk."}
           </div>
 
+          {live && status.info && (
+            <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 10, lineHeight: 1.5, color: `${ACCENT}bb`, fontFamily: "var(--font-mono)", borderTop: `1px solid ${ACCENT}1a`, paddingTop: 8 }}>
+              {status.info}
+            </div>
+          )}
+
           <a
             href="https://aistudio.google.com/apikey"
             target="_blank"
