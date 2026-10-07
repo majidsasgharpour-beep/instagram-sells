@@ -130,6 +130,23 @@ function allowMicrophone() {
   session.defaultSession.setPermissionCheckHandler((wc, permission) => ok(wc ? wc.getURL() : "", permission));
 }
 
+function sendKeyAsHeader() {
+  // Google's docs send the Gemini key in the x-goog-api-key header. A page cannot
+  // set headers on a WebSocket, so mirror the ?key= value into that header for
+  // Google's Generative Language host only - this lets the newer "AQ." keys
+  // authenticate the same way the docs show.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ["wss://generativelanguage.googleapis.com/*", "https://generativelanguage.googleapis.com/*"] },
+    (details, callback) => {
+      try {
+        const key = new URL(details.url).searchParams.get("key");
+        if (key) details.requestHeaders["x-goog-api-key"] = key;
+      } catch { /* leave the request as it is */ }
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+}
+
 async function launch() {
   win = new BrowserWindow({
     width: 1280,
@@ -179,6 +196,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     allowMicrophone();
+    sendKeyAsHeader();
     launch();
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) launch(); });
   });
