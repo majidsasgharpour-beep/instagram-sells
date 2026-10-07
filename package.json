@@ -2,13 +2,17 @@
   "name": "apex-ui",
   "version": "1.0.0",
   "description": "An animated autonomous-agent orb + reasoning-graph UI. Hand-written SVG/CSS, no 3D libraries.",
+  "main": "electron/main.js",
   "license": "MIT",
   "private": false,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "desktop": "electron .",
+    "desktop:dev": "electron . --dev",
+    "desktop:build": "electron . --rebuild"
   },
   "dependencies": {
     "next": "15.3.8",
@@ -26,6 +30,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.184.1",
     "eslint": "^9",
-    "eslint-config-next": "15.3.3"
+    "eslint-config-next": "15.3.3",
+    "electron": "^33.0.0"
   }
 }
