@@ -15,6 +15,8 @@ import ApexHeroOrb, { type OrbState } from "./ApexHeroOrb";
 import ReasoningWebJs from "./ReasoningWeb";
 import ShaderBackgroundJs from "./ShaderBackground";
 import OrbStatusBar from "./OrbStatusBar";
+import { GeminiLiveSession } from "@/lib/geminiLive";
+import { setStatus, useGeminiKey, useGeminiStatus } from "@/lib/geminiStore";
 
 export type NodeSel = { name: string; key: string; color: string };
 
@@ -237,9 +239,48 @@ export default function ApexWorld() {
   // backdrop, the light-cast and the reasoning web's activity level.
   const [showState, setShowState] = useState<OrbState>("idle");
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const orbState: OrbState = showState;
+
+  // With a Gemini key saved (key button in the OVERVIEW panel), tapping the orb
+  // starts / stops a live voice conversation and the live phase drives the orb.
+  // Without a key the tap keeps cycling the demo states.
+  const apiKey = useGeminiKey();
+  const gemini = useGeminiStatus();
+  const liveRef = useRef<GeminiLiveSession | null>(null);
+  const liveActive = gemini.phase !== "off";
+  const orbState: OrbState = liveActive
+    ? gemini.phase === "speaking" ? "speaking" : gemini.phase === "thinking" ? "thinking" : "idle"
+    : showState;
+  const barState = liveActive && gemini.phase === "listening" ? "listening" : orbState;
+
+  const stopLive = () => {
+    liveRef.current?.stop();
+    liveRef.current = null;
+    setStatus({ phase: "off" });
+  };
+
+  const startLive = () => {
+    setStatus({ phase: "connecting", error: null });
+    const session = new GeminiLiveSession(apiKey, {
+      onPhase: (p) => { if (liveRef.current === session) setStatus({ phase: p }); },
+      onError: (message) => { if (liveRef.current === session) setStatus({ error: message }); },
+      onClosed: () => { if (liveRef.current === session) { liveRef.current = null; setStatus({ phase: "off" }); } },
+    });
+    liveRef.current = session;
+    void session.start();
+  };
+
+  // key removed or replaced -> end the old session; leaving the page ends it too
+  useEffect(() => {
+    if (liveRef.current) stopLive();
+    setStatus({ error: null });
+  }, [apiKey]);
+  useEffect(() => () => { liveRef.current?.stop(); liveRef.current = null; setStatus({ phase: "off" }); }, []);
 
   const boost = () => {
+    if (apiKey) {
+      if (liveRef.current) stopLive(); else startLive();
+      return;
+    }
     const next: OrbState = showState === "idle" ? "thinking" : showState === "thinking" ? "speaking" : "idle";
     setShowState(next);
     if (showTimer.current) clearTimeout(showTimer.current);
@@ -329,7 +370,7 @@ export default function ApexWorld() {
       <div
         role="button"
         tabIndex={0}
-        aria-label="Apex core - tap to energize"
+        aria-label={apiKey ? "Apex core - tap to talk with Gemini" : "Apex core - tap to energize"}
         onClick={boost}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); boost(); } }}
         onMouseDown={(e) => e.preventDefault()}
@@ -341,7 +382,7 @@ export default function ApexWorld() {
       />
 
       {/* equalizer + STANDBY cluster */}
-      <OrbStatusBar state={orbState} />
+      <OrbStatusBar state={barState} />
 
       {selected && <AgentOverview sel={selected} onClose={() => setSelected(null)} />}
     </div>

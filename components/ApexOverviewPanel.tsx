@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles, Instagram, Facebook, Linkedin, ArrowUpRight } from "lucide-react";
+import GeminiKeyButton from "./GeminiKeyButton";
 
 const ACCENT = "#00e5ff";
 const WCODE: Record<number, string> = { 0: "Clear", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle", 61: "Rain", 63: "Rain", 65: "Heavy rain", 71: "Snow", 73: "Snow", 75: "Snow", 80: "Showers", 81: "Showers", 82: "Showers", 95: "Storm", 96: "Storm", 99: "Storm" };
@@ -70,6 +71,7 @@ function Clock() {
           </div>
         </div>
       )}
+      <GeminiKeyButton />
     </div>
   );
 }
